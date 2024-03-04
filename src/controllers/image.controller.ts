@@ -12,7 +12,7 @@ import 'dotenv/config';
 import {IMAGE_END_POINTS} from '../constants';
 import {FileDetails} from '../dtos/file.dto';
 import {storeNewImage, uploadFileAsync} from '../services/image.service';
-import {createResponseObject} from '../utils/common.service';
+import {ResponseDTO} from '../utils/common.dtos';
 
 /**
  * OpenAPI response for image()
@@ -131,21 +131,12 @@ export class ImageController {
   })
   // @intercept(getFile)
   // This is the corresponding function that will handle the GET image by id request
-  async storeImage(): Promise<{
-    error: string | null;
-    isError: boolean;
-    data: any;
-    statusCode: number;
-  }> {
+  async storeImage(): Promise<ResponseDTO> {
     try {
       await uploadFileAsync(this.req, this.res);
       if (!this.req.file) {
         throw new Error('No file uploaded');
       }
-
-      console.log('this.req.file');
-      console.log(this.req.file);
-      console.log(typeof this.req.file.buffer);
 
       const {originalname, encoding, mimetype, buffer} = this.req.file;
       const fileDetails: FileDetails = {
@@ -155,35 +146,11 @@ export class ImageController {
         buffer,
       };
 
-      await storeNewImage(fileDetails);
-      return await createResponseObject('', 200, false, '', null);
+      return await storeNewImage(fileDetails);
+      // return await createResponseObject('', 200, false, '', null);
     } catch (error) {
       console.error('Error uploading file:', error);
       throw new Error('Error uploading file');
     }
-
-    /*  upload.single('file')(this.req, this.res, async (err: any) => {
-      if (err) {
-        throw new Error('Error uploading file');
-      }
-      if (!this.req.file) {
-        throw new Error('No file uploaded');
-      }
-      console.log(`this.req.file`);
-      console.log(this.req.file);
-      console.log(typeof this.req.file.buffer);
-      const {originalname, encoding, mimetype, buffer} = this.req.file;
-      fileDetails: fileDetails = {
-        originalname,
-        encoding,
-        mimetype,
-        buffer,
-      };
-      const csvContentJson = await csvtojson().fromString(
-        this.req.file.buffer.toString('utf8'),
-      );
-      console.log(csvContentJson);
-
-    }); */
   }
 }

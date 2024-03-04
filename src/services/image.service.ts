@@ -2,12 +2,14 @@ import {PutObjectCommand, S3Client} from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import multer from 'multer';
 import {promisify} from 'util';
-import {FileDetails} from '../dtos/file.dto';
+import {FileDetails, ImageToDb} from '../dtos/file.dto';
+import {saveImageToDb} from '../repositories/images.repository';
+import {ResponseDTO} from '../utils/common.dtos';
+import {createResponseObject} from '../utils/common.service';
 const getImageName = (bytes = 32) => crypto.randomBytes(bytes).toString('hex');
 
-export async function storeNewImage(file: FileDetails): Promise<string> {
+export async function storeNewImage(file: FileDetails): Promise<ResponseDTO> {
   // put the object in S3
-
   const aws_access_key: any = process.env.AWS_ACCESS_KEY;
   const aws_secret_key: any = process.env.AWS_SECRET_KEY;
   const aws_region: any = process.env.AWS_REGION;
@@ -33,18 +35,37 @@ export async function storeNewImage(file: FileDetails): Promise<string> {
 
   const command = new PutObjectCommand(params);
   const data = await S3.send(command);
-  console.log(`data`);
-  console.log(data);
-  const s3Url = `https://s3.amazonaws.com/${bucket_name}/${file.originalname}`;
-
-  console.log('S3 URL:', s3Url);
-  // make entry in DB
-
-  /* return new Promise((resolve, reject) => {
-    resolve;
-  }) as any; */
-  return 'success';
+  if (data.$metadata.httpStatusCode !== 200) {
+    return await createResponseObject(
+      'Error in uploading the image',
+      data.$metadata.httpStatusCode,
+      true,
+      '',
+      null,
+    );
+  }
+  const obj = {imagename: imageName, originalName: file.originalname};
+  return await makeEntryinDB(obj);
 }
 const storage = multer.memoryStorage();
 const upload = multer({storage: storage});
 export const uploadFileAsync = promisify(upload.single('file'));
+
+async function makeEntryinDB(imageToDb: ImageToDb): Promise<ResponseDTO> {
+  try {
+    const createdImageResponseDb = await saveImageToDb(imageToDb);
+    if (createdImageResponseDb) {
+      return createResponseObject('', 201, false, '', createdImageResponseDb);
+    }
+    return createResponseObject(
+      'unable to save image details',
+      404,
+      true,
+      '',
+      null,
+    );
+  } catch (error) {
+    console.log('Failed creating the image entry in DB');
+    return createResponseObject(error, 500, true, '', null);
+  }
+}
